@@ -84,6 +84,9 @@ function onAct(act, el) {
     case 'draftToMe': simDraftToUser(G); persist(); render(); if (draftDone(G)) toast('The draft is over.'); return;
     case 'finishDraft': finishDraft(G); UI.tab = 'contracts'; persist(); render(); toast('Draft complete. Time to re-sign your players.'); return;
     case 'draftPick': draftPlayer(G, +id); simDraftToUser(G); persist(); render(); return;
+    case 'dPos': UI.dPos = el.dataset.k; render(); return;
+    case 'dSort': UI.dSort = el.dataset.k; render(); return;
+    case 'autoScout': { const n = autoScoutNeeds(G); toast(n ? `Scouted ${n} prospect report${n > 1 ? 's' : ''} at your need positions. ${G.scoutPts} points left.` : G.scoutPts < 2 ? 'Not enough scouting points.' : 'No unscouted prospects at your need positions.'); persist(); render(); return; }
     case 'scout': { const err = scoutPlayer(G, G.players[+id]); if (err) toast(err); persist(); render(); return; }
     case 'startFA': startFreeAgency(G); UI.tab = 'fa'; persist(); render(); return;
     case 'faDay': advanceFADay(G); if (G.phase === 'preseason') { UI.tab = 'home'; toast('Free agency is over. Training camp opens.'); } persist(); render(); return;

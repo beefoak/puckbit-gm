@@ -1,6 +1,39 @@
 'use strict';
 // ================= UI: front office (cap, FA, trades, draft, coaches, arena) =================
 
+// ---------- Needs & grades ----------
+function needChip(pos, v, short) { const l = needLevel(v); return `<span class="nd ${l[2]}" title="${POS_NAME[pos]}: ${l[1]} need (${v.toFixed(1)}/10)">${short ? pos : pos + ' ' + l[1]}</span>`; }
+function needRow(need) { return `<span class="needrow">${POSITIONS.map(p => needChip(p, need[p], true)).join('')}</span>`; }
+function needBars(need) { return `<div class="needs">${POSITIONS.map(p => { const l = needLevel(need[p]); return `<div class="need-row"><span class="px small">${p}</span><div class="bar"><i class="${l[2]}" style="width:${Math.max(4, need[p] * 10)}%"></i></div><span class="small">${l[1]}</span></div>`; }).join('')}</div>`; }
+function gradeB(g) { return `<span class="grade g${g[0]}">${g}</span>`; }
+function impactHtml(imp, label) {
+  const ch = POSITIONS.filter(p => Math.abs(imp.na[p] - imp.nb[p]) >= 0.4).map(p => { const better = imp.na[p] < imp.nb[p]; return `<span class="${better ? 'good' : 'bad'}">${p} ${imp.nb[p].toFixed(1)}→${imp.na[p].toFixed(1)}${needLevel(imp.na[p])[1] !== needLevel(imp.nb[p])[1] ? ' (' + needLevel(imp.na[p])[1] + ')' : ''}</span>`; });
+  const d = imp.sa - imp.sb;
+  return `<p class="small"><b>${label}</b> strength ${imp.sb.toFixed(1)} → <b class="${d > 0.05 ? 'good' : d < -0.05 ? 'bad' : ''}">${imp.sa.toFixed(1)}</b> · rank #${imp.rb} → #${imp.ra}${ch.length ? ' · need: ' + ch.join(', ') : ' · needs unchanged'}</p>`;
+}
+function impactVerdict(imp) {
+  const fills = POSITIONS.filter(p => imp.nb[p] >= 5.5 && imp.na[p] <= imp.nb[p] - 0.8), holes = POSITIONS.filter(p => imp.na[p] >= 6.5 && imp.na[p] >= imp.nb[p] + 0.8);
+  const out = [];
+  if (fills.length) out.push(`<span class="good">Fills your ${fills.map(p => POS_NAME[p].toLowerCase()).join(' and ')} need</span>`);
+  if (holes.length) out.push(`<span class="bad">Opens a hole at ${holes.map(p => POS_NAME[p].toLowerCase()).join(' and ')}</span>`);
+  const d = imp.sa - imp.sb;
+  out.push(d > 0.15 ? '<span class="good">Makes you better now</span>' : d < -0.15 ? '<span class="bad">Makes you weaker now</span>' : '<span class="dim">About even for this season</span>');
+  return out.join(' · ');
+}
+function gradesPanel(kind, year) {
+  const gb = G.grades && G.grades[year] && G.grades[year][kind]; if (!gb) return '';
+  const rows = G.teams.map(t => ({ t, e: gb[t.id] })).filter(r => r.e).sort((a, b) => b.e.z - a.e.z);
+  const u = gb[G.userTeam];
+  const list = (arr) => arr && arr.length ? arr.map(x => `${esc(x[0])} <span class="dim">${x[1]} ${x[2]}</span>`).join(', ') : '<span class="dim">none</span>';
+  const pickTxt = (x) => `#${x[4]} ${esc(x[0])} <span class="dim">${x[1]} · ${x[2]} now, ${potGrade(x[3])} pot, proj ${x[5]}</span>`;
+  let card = '';
+  if (u) card = `<div class="report">${gradeB(u.g)}<div><p>${kind === 'fa' ? 'Strength' : 'Projected strength (2 seasons out)'} ${u.sb.toFixed(1)} → <b>${u.sa.toFixed(1)}</b> · league rank #${u.rb} → <b>#${u.ra}</b></p>${kind === 'fa'
+    ? `<p class="small">Re-signed (${u.nRe}): ${list(u.re)}</p><p class="small">Added (${u.nIn}): ${list(u.in)}</p><p class="small">Lost (${u.nOut}): ${list(u.out)}</p>`
+    : `<p class="small">Needs going in: ${u.needs.length ? u.needs.map(p => POS_NAME[p]).join(', ') : 'none major'} · value vs. draft slot: <span class="${u.vos >= 0 ? 'good' : 'bad'}">${u.vos >= 0 ? '+' : ''}${u.vos}</span></p><p class="small">${u.picks.length ? u.picks.map(pickTxt).join('<br>') : 'No picks.'}</p>`}</div></div>`;
+  const key = (e) => kind === 'fa' ? (e.in[0] ? `+ ${esc(e.in[0][0])} (${e.in[0][1]} ${e.in[0][2]})` : '') + (e.out[0] ? ` <span class="bad">− ${esc(e.out[0][0])} (${e.out[0][1]} ${e.out[0][2]})</span>` : '') : (e.picks[0] ? pickTxt(e.picks[0]) : '<span class="dim">no picks</span>');
+  return panel(`${year} ${kind === 'fa' ? 'FREE AGENCY' : 'DRAFT'} GRADES`, `${card}<div class="scroll"><table class="tbl small"><tr><th>#</th><th>TEAM</th><th>GRADE</th><th>STRENGTH</th><th>RANK</th><th>${kind === 'fa' ? 'BIGGEST MOVES' : 'TOP PICK'}</th></tr>${rows.map((r, i) => `<tr class="${r.t.id === G.userTeam ? 'me-row' : ''}"><td class="dim">${i + 1}</td><td>${teamLink(r.t.id)}</td><td>${gradeB(r.e.g)}</td><td>${r.e.sb.toFixed(1)} → ${r.e.sa.toFixed(1)}</td><td>#${r.e.rb} → #${r.e.ra}</td><td>${key(r.e)}</td></tr>`).join('')}</table></div><p class="dim small">Grades are curved across the league: each team's change in ${kind === 'fa' ? 'strength' : 'projected strength'} against everyone else's, plus where it ranks afterward${kind === 'draft' ? ', the value it got for each slot and whether its early picks filled its needs' : ''}.</p>`);
+}
+
 // ---------- Contracts & cap ----------
 function vContracts() {
   const u = TM(G.userTeam);
@@ -35,10 +68,12 @@ function negotiateModal(pid, kind) {
 function vFA() {
   let ps = G.fa.map(id => G.players[id]).filter(Boolean).filter(p => UI.faPos === 'ALL' || (UI.faPos === 'F' ? FWD.includes(p.pos) : p.pos === UI.faPos));
   ps.sort((a, b) => b.ovr - a.ovr);
-  const u = TM(G.userTeam);
-  return panel(`FREE AGENTS · ${G.fa.length} · CAP SPACE ${fmtM(capSpace(G, u))}`, `<div class="filters">${['ALL', 'F', 'C', 'LW', 'RW', 'D', 'G'].map(k => `<button class="chip ${UI.faPos === k ? 'on' : ''}" data-act="faPos" data-k="${k}">${k}</button>`).join('')}</div>
+  const u = TM(G.userTeam), need = teamNeeds(G, u);
+  const fa = G.grades && G.grades[G.year] && G.grades[G.year].fa;
+  return (fa && G.phase !== 'fa' ? gradesPanel('fa', G.year) : '') + panel(`FREE AGENTS · ${G.fa.length} · CAP SPACE ${fmtM(capSpace(G, u))}`, `<div class="filters">${['ALL', 'F', 'C', 'LW', 'RW', 'D', 'G'].map(k => `<button class="chip ${UI.faPos === k ? 'on' : ''}" data-act="faPos" data-k="${k}">${k}</button>`).join('')}</div>
     ${G.phase === 'fa' ? `<p class="dim small">Free agency day ${G.faDay}/5. AI teams sign players every day, and holdouts lower their price as days pass.</p>` : '<p class="dim small">Players left unsigned after free agency can be signed any time, usually at a discount.</p>'}
-    <div class="scroll tall"><table class="tbl"><tr><th>OVR</th><th>POT</th><th>POS</th><th>NAME</th><th>AGE</th><th>STYLE</th><th>LAST TEAM</th><th>ASKING</th><th></th></tr>${ps.slice(0, 200).map(p => { const a = askingContract(G, p); return `<tr><td>${ovrB(p.ovr)}</td><td>${potB(p.pot, p.gen)}</td><td>${p.pos}</td><td>${pLink(p)} ${p.injury ? '<span class="inj small">INJ</span>' : ''}</td><td>${p.age}</td><td class="small">${esc(p.style || playerStyle(p))}</td><td>${p.lastTeam !== undefined && TM(p.lastTeam) ? TM(p.lastTeam).abbr : '-'}</td><td>${fmtM(a.sal)} × ${a.yrs}</td><td><button class="btn tiny" data-act="faOffer" data-id="${p.id}">OFFER</button></td></tr>`; }).join('')}</table></div>`);
+    <p class="small">Your needs: ${needRow(need)}</p>
+    <div class="scroll tall"><table class="tbl"><tr><th>OVR</th><th>POT</th><th>POS</th><th>FIT</th><th>NAME</th><th>AGE</th><th>STYLE</th><th>LAST TEAM</th><th>ASKING</th><th></th></tr>${ps.slice(0, 200).map(p => { const a = askingContract(G, p); return `<tr><td>${ovrB(p.ovr)}</td><td>${potB(p.pot, p.gen)}</td><td>${p.pos}</td><td>${needChip(p.pos, need[p.pos], true)}</td><td>${pLink(p)} ${p.injury ? '<span class="inj small">INJ</span>' : ''}</td><td>${p.age}</td><td class="small">${esc(p.style || playerStyle(p))}</td><td>${p.lastTeam !== undefined && TM(p.lastTeam) ? TM(p.lastTeam).abbr : '-'}</td><td>${fmtM(a.sal)} × ${a.yrs}</td><td><button class="btn tiny" data-act="faOffer" data-id="${p.id}">OFFER</button></td></tr>`; }).join('')}</table></div>`);
 }
 
 // ---------- Trade ----------
@@ -49,17 +84,19 @@ function assetsOf(tid) {
   const picks = teamPicks(G, tid).map(pk => ({ type: 'pick', year: pk.year, rd: pk.rd, orig: pk.orig }));
   return [...players, ...picks];
 }
-function assetRow(a, side, sel) {
+function assetRow(a, side, sel, need) {
   if (a.type === 'pick') return `<tr class="asset ${sel ? 'sel' : ''}" data-act="trSel" data-side="${side}" data-k="${assetKey(a)}"><td class="cbox">${sel ? '■' : '□'}</td><td colspan="2">${a.year} Round ${a.rd} pick <span class="dim">(${esc(TM(a.orig).abbr)}${a.year === G.year + 1 && (G.phase === 'regular' || G.phase === 'playoffs') ? ', proj. #' + projectedSlot(G, a.orig) : ''})</span></td><td></td><td class="small dim">value ${Math.round(pickValue(G, a))}</td></tr>`;
   const p = G.players[a.pid];
-  return `<tr class="asset ${sel ? 'sel' : ''}" data-act="trSel" data-side="${side}" data-k="${assetKey(a)}"><td class="cbox">${sel ? '■' : '□'}</td><td>${ovrB(p.ovr)} ${p.pos}</td><td>${esc(fullName(p))} <span class="dim small">${p.age}y${p.farm ? ' farm' : ''}${p.injury ? ' INJ' : ''}</span></td><td class="small">${p.contract ? fmtM(p.contract.sal) + '→' + String(p.contract.exp).slice(2) : ''}</td><td class="small dim">${potGrade(p.pot, p.gen)}</td></tr>`;
+  return `<tr class="asset ${sel ? 'sel' : ''}" data-act="trSel" data-side="${side}" data-k="${assetKey(a)}"><td class="cbox">${sel ? '■' : '□'}</td><td>${ovrB(p.ovr)} ${p.pos}</td><td>${esc(fullName(p))} <span class="dim small">${p.age}y${p.farm ? ' farm' : ''}${p.injury ? ' INJ' : ''}</span>${need && need[p.pos] >= 6.5 && !p.farm ? ` <span class="nd ${side === 'mine' ? 'nd-high' : 'nd-ok'}">${side === 'mine' ? 'THEY NEED' : 'FILLS NEED'}</span>` : ''}</td><td class="small">${p.contract ? fmtM(p.contract.sal) + '→' + String(p.contract.exp).slice(2) : ''}</td><td class="small dim">${potGrade(p.pot, p.gen)}</td></tr>`;
 }
 function vTrade() {
   const T = UI.tr;
   let h = '';
   if (G.offers.length) {
     h += panel(`TRADE OFFERS · ${G.offers.length}`, G.offers.map(o => { const desc = (arr) => arr.map(a => a.type === 'pick' ? `${a.year} R${a.rd} pick (${TM(a.orig).abbr})` : G.players[a.pid] ? `${G.players[a.pid].pos} ${pLink(G.players[a.pid])} (${G.players[a.pid].ovr})` : '?').join(', ');
-      return `<div class="offer-card"><div class="offer-head">${crest(o.partner, 24)} <b>${esc(TM(o.partner).city)} ${esc(TM(o.partner).name)}</b></div><p>They want: ${desc(o.want)}</p><p>They offer: ${desc(o.give)}</p><button class="btn tiny" data-act="acceptOffer" data-id="${o.id}">ACCEPT</button><button class="btn tiny alt" data-act="declineOffer" data-id="${o.id}">DECLINE</button></div>`; }).join(''), 'recpanel');
+      const ids = (arr) => arr.filter(a => a.type === 'player' && G.players[a.pid]).map(a => a.pid);
+      const imp = tradeImpact(G, G.userTeam, ids(o.want), ids(o.give));
+      return `<div class="offer-card"><div class="offer-head">${crest(o.partner, 24)} <b>${esc(TM(o.partner).city)} ${esc(TM(o.partner).name)}</b> <span class="small dim">their needs:</span> ${needRow(teamNeeds(G, TM(o.partner)))}</div><p>They want: ${desc(o.want)}</p><p>They offer: ${desc(o.give)}</p>${impactHtml(imp, 'YOU:')}<p class="small">${impactVerdict(imp)}</p><button class="btn tiny" data-act="acceptOffer" data-id="${o.id}">ACCEPT</button><button class="btn tiny alt" data-act="declineOffer" data-id="${o.id}">DECLINE</button></div>`; }).join(''), 'recpanel');
   }
   if (G.phase === 'playoffs') return h + panel('TRADE', '<p class="dim">No trades during the playoffs.</p>');
   const partner = T.partner === null ? null : +T.partner;
@@ -70,12 +107,21 @@ function vTrade() {
   const give = mine.filter(a => selM.has(assetKey(a))), get = theirs.filter(a => selT.has(assetKey(a)));
   const ev = evaluateTrade(G, partner, give, get);
   const ratio = clamp(ev.ratio, 0, 2);
+  const myNeed = teamNeeds(G, TM(G.userTeam)), theirNeed = teamNeeds(G, TM(partner));
+  const pids = (arr) => arr.filter(a => a.type === 'player').map(a => a.pid);
+  let impact = '';
+  if (give.some(a => a.type === 'player') || get.some(a => a.type === 'player')) {
+    const mi = tradeImpact(G, G.userTeam, pids(give), pids(get)), ti = tradeImpact(G, partner, pids(get), pids(give));
+    impact = `${impactHtml(mi, 'YOU:')}<p class="small">${impactVerdict(mi)}</p>${impactHtml(ti, TM(partner).abbr + ':')}`;
+  }
   const salIn = sum(get.filter(a => a.type === 'player' && !G.players[a.pid].farm), a => G.players[a.pid].contract ? G.players[a.pid].contract.sal : 0), salOut = sum(give.filter(a => a.type === 'player' && !G.players[a.pid].farm), a => G.players[a.pid].contract ? G.players[a.pid].contract.sal : 0);
   h += panel('THE DEAL', `<div class="meter"><div class="bar"><i class="${ev.ok ? 'o-great' : ratio > 0.85 ? 'o-good' : 'm-bad'}" style="width:${Math.round(ratio / 2 * 100)}%"></i><span class="mark" style="left:50%"></span></div></div>
     <p>${!give.length && !get.length ? 'Select assets on both sides.' : ev.reason ? `<span class="bad">${esc(ev.reason)}</span>` : ev.ok ? `<span class="good">The ${esc(TM(partner).name)} would accept this deal.</span>` : `<span class="bad">The ${esc(TM(partner).name)} want more (${Math.round(ratio * 100)}% of what they need).</span>`}</p>
-    <p class="small dim">Your cap after: ${fmtM(capSpace(G, TM(G.userTeam)) + salOut - salIn)} space</p>
+    ${impact}
+    <p class="small">Your needs: ${needRow(myNeed)} · ${esc(TM(partner).abbr)} needs: ${needRow(theirNeed)}</p>
+    <p class="small dim">Your cap after: ${fmtM(capSpace(G, TM(G.userTeam)) + salOut - salIn)} space. Teams value players at positions they need a little higher.</p>
     <button class="btn" data-act="trPropose" ${ev.ok ? '' : 'disabled'}>PROPOSE TRADE</button><button class="btn alt" data-act="trAsk" title="Ask what they'd give for your selected player">WHAT WOULD THEY OFFER?</button><button class="btn tiny alt" data-act="trClear">CLEAR</button>`, 'dealpanel');
-  h += `<div class="grid2">${panel(`YOU GIVE · ${esc(TM(G.userTeam).abbr)}`, `<div class="scroll tall"><table class="tbl small assets">${mine.map(a => assetRow(a, 'mine', selM.has(assetKey(a)))).join('')}</table></div>`)}${panel(`YOU GET · ${esc(TM(partner).abbr)}`, `<div class="scroll tall"><table class="tbl small assets">${theirs.map(a => assetRow(a, 'theirs', selT.has(assetKey(a)))).join('')}</table></div>`)}</div>`;
+  h += `<div class="grid2">${panel(`YOU GIVE · ${esc(TM(G.userTeam).abbr)}`, `<div class="scroll tall"><table class="tbl small assets">${mine.map(a => assetRow(a, 'mine', selM.has(assetKey(a)), theirNeed)).join('')}</table></div>`)}${panel(`YOU GET · ${esc(TM(partner).abbr)}`, `<div class="scroll tall"><table class="tbl small assets">${theirs.map(a => assetRow(a, 'theirs', selT.has(assetKey(a)), myNeed)).join('')}</table></div>`)}</div>`;
   return h;
 }
 function tradeAssetByKey(tid, k) { return assetsOf(tid).find(a => assetKey(a) === k); }
@@ -90,11 +136,16 @@ function vDraft() {
     const onClock = pick && pick.tid === G.userTeam;
     h += `<div class="draft-banner ${onClock ? 'mine' : ''}"><div><div class="px">${G.year} DRAFT · ${draftDone(G) ? 'COMPLETE' : `ROUND ${pick.rd} · PICK #${pick.ovr}`}</div>${!draftDone(G) ? `<div>On the clock: ${teamLink(pick.tid, true)}</div>` : ''}${G.lottery && G.lottery.year === G.year ? `<div class="small dim">Lottery winners: ${G.lottery.winners.map(w => `${TM(w.tid).abbr} (from #${w.from})`).join(', ')}</div>` : ''}</div>
       <div>${onClock ? '<span class="px gold blink2">YOUR PICK - CHOOSE A PLAYER BELOW</span>' : !draftDone(G) ? '<button class="btn alt" data-act="draftToMe">SIM TO MY PICK</button>' : ''}<button class="btn" data-act="finishDraft">»» FINISH DRAFT</button></div></div>`;
-  } else h += panel(`${G.year + (G.phase === 'regular' || G.phase === 'playoffs' || G.phase === 'postseason' ? 1 : 0)} DRAFT CLASS · SCOUTING POINTS: ${G.scoutPts}`, `<p class="dim small">You earn 3 scouting points every two weeks of the season. Each scouting level sharpens the estimates (costs 2, 3 and 5 points). The class profile: <b>${esc(G.classProfile ? G.classProfile.overall : 'avg')}</b>.</p>`);
-  const ids = pool.slice(0, 160);
-  const rows = ids.map((id, i) => { const p = G.players[id]; if (!p) return ''; return `<tr><td class="dim">${i + 1}</td><td>${p.pos}</td><td>${pLink(p)}</td><td>${p.age}</td><td class="small">${esc(p.nat)} · ${esc(p.college || '')}</td><td>${ovrB(p.sOvr)}</td><td>${potB(p.sPot)}</td><td><span class="pips">${[0, 1, 2].map(k => `<i class="${(p.sc || 0) > k ? 'on' : ''}"></i>`).join('')}</span></td><td>${(p.sc || 0) < 3 ? `<button class="btn tiny alt" data-act="scout" data-id="${p.id}">SCOUT (${[2, 3, 5][p.sc || 0]})</button>` : ''}${D && !draftDone(G) && D.picks[D.cur].tid === G.userTeam ? `<button class="btn tiny" data-act="draftPick" data-id="${p.id}">DRAFT</button>` : ''}</td></tr>`; }).join('');
+  } else h += panel(`${G.year + 1} DRAFT CLASS · SCOUTING POINTS: ${G.scoutPts}`, `<p class="dim small">You earn 3 scouting points every two weeks of the season. Each scouting level sharpens the estimates (costs 2, 3 and 5 points). The class profile: <b>${esc(G.classProfile ? G.classProfile.overall : 'avg')}</b>.</p>`);
+  const need = draftNeeds(G, TM(G.userTeam));
+  const dPos = UI.dPos || 'ALL', fitSort = UI.dSort === 'fit';
+  let ids = pool.map((id, i) => ({ id, i, p: G.players[id] })).filter(x => x.p && (dPos === 'ALL' || (dPos === 'F' ? FWD.includes(x.p.pos) : x.p.pos === dPos)));
+  if (fitSort) ids.sort((a, b) => fitScore(b.p, need) - fitScore(a.p, need));
+  ids = ids.slice(0, 160);
+  const rows = ids.map(({ i, p }) => { return `<tr><td class="dim">${i + 1}</td><td>${p.pos}</td><td>${needChip(p.pos, need[p.pos], true)}</td><td>${pLink(p)}</td><td>${p.age}</td><td class="small">${esc(p.nat)} · ${esc(p.college || '')}</td><td>${ovrB(p.sOvr)}</td><td>${potB(p.sPot)}</td><td><span class="pips">${[0, 1, 2].map(k => `<i class="${(p.sc || 0) > k ? 'on' : ''}"></i>`).join('')}</span></td><td>${(p.sc || 0) < 3 ? `<button class="btn tiny alt" data-act="scout" data-id="${p.id}">SCOUT (${[2, 3, 5][p.sc || 0]})</button>` : ''}${D && !draftDone(G) && D.picks[D.cur].tid === G.userTeam ? `<button class="btn tiny" data-act="draftPick" data-id="${p.id}">DRAFT</button>` : ''}</td></tr>`; }).join('');
   h += `<div class="grid-draft">`;
-  h += panel(`BIG BOARD${D ? ` · SCOUTING POINTS ${G.scoutPts}` : ''}`, `<div class="scroll tall bigboard"><table class="tbl small"><tr><th>#</th><th>POS</th><th>NAME</th><th>AGE</th><th>FROM</th><th>OVR*</th><th>POT*</th><th>SCOUTED</th><th></th></tr>${rows}</table></div><p class="dim small">* scouting estimates.</p>`);
+  const filt = `<div class="filters">${['ALL', 'F', 'C', 'LW', 'RW', 'D', 'G'].map(k => `<button class="chip ${dPos === k ? 'on' : ''}" data-act="dPos" data-k="${k}">${k}</button>`).join('')} <button class="chip ${fitSort ? '' : 'on'}" data-act="dSort" data-k="board">BOARD ORDER</button><button class="chip ${fitSort ? 'on' : ''}" data-act="dSort" data-k="fit" title="Board value plus a bonus at positions you need">BEST FIT</button> <button class="btn tiny alt" data-act="autoScout" title="Spend scouting points on top prospects at your need positions">AUTO-SCOUT NEEDS</button></div>`;
+  h += panel(`BIG BOARD${D ? ` · SCOUTING POINTS ${G.scoutPts}` : ''}`, `${filt}<div class="scroll tall bigboard"><table class="tbl small"><tr><th>#</th><th>POS</th><th>FIT</th><th>NAME</th><th>AGE</th><th>FROM</th><th>OVR*</th><th>POT*</th><th>SCOUTED</th><th></th></tr>${rows}</table></div><p class="dim small">* scouting estimates.</p>`);
   let side = '';
   if (D) {
     const made = D.picks.filter(p => p.pid).slice(-40).reverse();
@@ -105,7 +156,9 @@ function vDraft() {
     if (yrs.length) { const y = yrs[0]; side += `<h4 class="px">${y} DRAFT · FIRST ROUND</h4><table class="tbl small">${G.draftHistory[y].filter(p => p.rd === 1).map(p => `<tr class="${p.tid === G.userTeam ? 'me-row' : ''}"><td class="dim">#${p.ovr}</td><td>${crest(p.tid, 14)} ${esc(TM(p.tid).abbr)}</td><td>${pidLink(p.pid, p.name)} <span class="dim">${p.pos}</span></td></tr>`).join('')}</table>`; }
     else side += '<p class="dim">Draft history appears after your first draft.</p>';
   }
+  side = `<h4 class="px">YOUR NEEDS</h4>${needBars(need)}<p class="dim small">Draft needs blend today's depth chart with how it looks in two seasons, when today's prospects are ready.</p>` + side;
   h += panel('DRAFT ROOM', side) + `</div>`;
+  if (!D) { const ys = Object.keys(G.grades || {}).map(Number).filter(y => G.grades[y].draft).sort((a, b) => b - a); if (ys.length) h += gradesPanel('draft', ys[0]); }
   return h;
 }
 

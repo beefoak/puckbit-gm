@@ -29,6 +29,8 @@ Then open http://localhost:8791.
 - **Hockey players**: C/LW/RW/D/G with skating, shooting, passing, IQ, checking, blocking, faceoff and goalie ratings. Each player has a play style, a nationality-weighted name, aging and potential.
 - **Lines editor**: 4 forward lines, 3 D pairs, 2 goalies, PP and PK units, and the starter's share of games.
 - **Advanced stats**: CF/CA (Corsi), ixG, GSAx, P/60, TOI, faceoffs, PP/PK, hits, blocks, takeaways and giveaways.
+- **Roster needs**: each position's depth chart is compared slot by slot with the league average and with the rest of your roster, giving a CRITICAL to STRONG need. Needs show up as fit tags on the big board and free agents, in the trade builder and on incoming offers (with before/after strength and rank), and steer AI drafting, free agency and trade offers. Auto-scout spends scouting points at your need positions.
+- **Offseason grades**: draft and free-agency grades are curved across the league from each team's change in strength (projected strength for the draft), its rank afterward, and, for the draft, value against slot and whether early picks filled needs.
 - **Front office**: salary cap with buyouts and dead money, re-signing, 5-day free agency, trades with picks and AI offers, a 7-round draft with lottery and scouting, and an AHL farm team.
 - **From the BitBall beta**:
   - coaching staffs (head coach, associate, assistant, goalie coach) with systems, quirks and a coaching carousel;
@@ -45,6 +47,7 @@ Then open http://localhost:8791.
 | `js/history.js` | 1960-2025 history generator |
 | `js/league.js` | Season, playoffs, awards, records, offseason, draft, save/load |
 | `js/biz.js` | Cap, contracts, free agency, trades |
+| `js/needs.js` | Positional needs, team strength, draft and free-agency grades |
 | `js/coaches.js`, `js/ops.js`, `js/morale.js`, `js/faces.js` | Beta systems adapted from BitBall |
 | `js/rink.js` | Live canvas rink viewer |
 | `js/ui*.js`, `js/main.js` | Interface and game flow |

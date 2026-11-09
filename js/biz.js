@@ -141,6 +141,7 @@ function advanceFADay(L) {
 }
 function endFreeAgency(L) {
   for (const t of L.teams) if (t.id !== L.userTeam) { aiManageRoster(L, t); aiCapComply(L, t); }
+  computeFAGrades(L);
   L.fa.sort((a, b) => playerValue(L.players[b]) - playerValue(L.players[a]));
   const keep = L.fa.slice(0, 160), drop = L.fa.slice(160);
   drop.forEach(id => { const p = L.players[id]; if (p) { if (p.age >= 27) retireRecord(L, p, L.year - 1); delete L.players[id]; } });
@@ -212,9 +213,11 @@ function executeTrade(L, a, b, aGives, bGives) {
 // What would the AI want for one of the user's players? Used for counter-offers and AI-initiated offers.
 function aiBuildOffer(L, partner, wantPid) {
   const want = L.players[wantPid]; const target = tradeValue(L, want, partner) * 1.05;
-  const t = L.teams[partner];
-  const assets = [...rosterPlayers(L, t).filter(p => p.ovr < want.ovr + 3).map(p => ({ type: 'player', pid: p.id })), ...teamPicks(L, partner).map(pk => ({ type: 'pick', ...pk }))];
-  assets.sort((a, b) => assetValue(L, b, L.userTeam) - assetValue(L, a, L.userTeam));
+  const t = L.teams[partner], theirNeed = teamNeeds(L, t), userNeed = teamNeeds(L, L.teams[L.userTeam]);
+  const spare = (p) => p.ovr < want.ovr + 3 && !(theirNeed[p.pos] >= 7 && p.pos !== want.pos && !p.farm);
+  const assets = [...rosterPlayers(L, t).filter(spare).map(p => ({ type: 'player', pid: p.id })), ...teamPicks(L, partner).map(pk => ({ type: 'pick', ...pk }))];
+  const fitKey = (a) => assetValue(L, a, L.userTeam) * (a.type === 'player' ? 1 + Math.max(0, userNeed[L.players[a.pid].pos] - 5) * 0.08 : 1);
+  assets.sort((a, b) => fitKey(b) - fitKey(a));
   const pick = []; let v = 0;
   for (const a of assets) { if (v >= target) break; const av = assetValue(L, a, L.userTeam); if (v + av > target * 1.35 && v > 0) continue; pick.push(a); v += av; if (pick.length >= 3) break; }
   return v >= target * 0.92 ? pick : null;
@@ -225,7 +228,7 @@ function maybeTradeOffer(L) {
   const mine = nhlRoster(L, u).filter(p => p.ovr >= 68 && !p.injury);
   if (!mine.length) return;
   const want = R.weighted(mine, p => Math.pow(p.ovr - 60, 2));
-  const partner = R.pick(L.teams.filter(t => t.id !== L.userTeam)).id;
+  const partner = R.weighted(L.teams.filter(t => t.id !== L.userTeam), t => 0.25 + Math.max(0, teamNeeds(L, t)[want.pos] - 4)).id;
   const offer = aiBuildOffer(L, partner, want.id);
   if (!offer) return;
   L.offers.push({ id: 'o' + Date.now() + R.int(0, 999), partner, want: [{ type: 'player', pid: want.id }], give: offer, y: L.year, d: L.day });
@@ -244,8 +247,9 @@ function acceptOffer(L, id) {
 // Occasional AI-to-AI trades keep the league moving.
 function aiTrades(L) {
   if (!R.chance(0.2)) return;
-  const [a, b] = R.shuffle(L.teams.filter(t => t.id !== L.userTeam)).slice(0, 2);
+  const a = R.pick(L.teams.filter(t => t.id !== L.userTeam));
   const pa = R.pick(nhlRoster(L, a).filter(p => p.ovr >= 66)); if (!pa) return;
+  const b = R.weighted(L.teams.filter(t => t.id !== L.userTeam && t.id !== a.id), t => 0.3 + Math.max(0, teamNeeds(L, t)[pa.pos] - 4));
   const pb = nhlRoster(L, b).filter(p => p.pos === pa.pos || R.chance(0.3)).sort((x, y) => Math.abs(tradeValue(L, x) - tradeValue(L, pa)) - Math.abs(tradeValue(L, y) - tradeValue(L, pa)))[0];
   if (!pb || Math.abs(tradeValue(L, pb) - tradeValue(L, pa)) > tradeValue(L, pa) * 0.15) return;
   if (payroll(L, a) - pa.contract.sal + pb.contract.sal > L.cap || payroll(L, b) - pb.contract.sal + pa.contract.sal > L.cap) return;

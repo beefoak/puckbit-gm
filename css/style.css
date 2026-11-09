@@ -263,3 +263,14 @@ ul.pbp li{padding:2px 0;border-bottom:1px dashed #263060}ul.pbp li.goal{color:va
 .lineage{list-style:none;padding:0;margin:4px 0}.lineage li{padding:3px 0}
 .swatch{display:inline-block;width:12px;height:12px;border:2px solid #000;vertical-align:middle}
 .adv th{font-size:7px}
+
+/* needs & grades */
+.nd{display:inline-block;font-family:'Press Start 2P',monospace;font-size:7px;padding:3px 4px;margin:1px;border:2px solid #000;color:#111;vertical-align:middle}
+.nd-crit,.needs .nd-crit{background:#ff4d5e}.nd-high,.needs .nd-high{background:#ff9f1c}.nd-mod,.needs .nd-mod{background:#c9cfe8}.nd-low,.needs .nd-low{background:#7fd1ff}.nd-ok,.needs .nd-ok{background:#3fdc6c}
+.needrow{white-space:nowrap}
+.needs .need-row{display:grid;grid-template-columns:28px 1fr 74px;gap:8px;align-items:center;margin:4px 0}
+.needs .bar{height:10px}.needs .bar i{display:block;height:100%}
+.grade{display:inline-block;font-family:'Press Start 2P',monospace;font-size:10px;padding:4px 5px;min-width:30px;text-align:center;border:2px solid #000;color:#111}
+.report .grade{font-size:22px;padding:10px 8px;min-width:64px}
+.gA{background:#3fdc6c}.gB{background:#7fd1ff}.gC{background:#c9cfe8}.gD{background:#ff9f1c}.gF{background:#ff4d5e}
+.report{display:flex;gap:14px;align-items:flex-start;margin-bottom:10px}.report p{margin:2px 0 6px}

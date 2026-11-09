@@ -673,6 +673,7 @@ function runOffseason(L) {
   if (L.pickOwn) delete L.pickOwn[L.year];
   L.draft = { year: L.year, picks, pool: sortBoard(L, pool), cur: 0 };
   L.phase = 'draft';
+  gradeSnapshot(L, 'draft');
   news(L, `${retiredCount} players retired. The ${L.year} Draft order is set - ${L.teams[picks[0].tid].abbr} pick first overall.`, L.userTeam);
 }
 function seasonLeaders(L) {
@@ -758,14 +759,10 @@ function draftPlayer(L, pid) {
   D.cur++;
   if (pick.rd === 1 && pick.pk <= 3 || team.id === L.userTeam) news(L, `Draft R${pick.rd} #${pick.ovr}: ${team.abbr} select ${p.pos} ${fullName(p)} (${p.nat}, ${p.college}).`, team.id);
 }
-function teamNeedsSimple(L, team) {
-  const c = posCounts(rosterPlayers(L, team)); const need = {};
-  for (const ps of POSITIONS) need[ps] = clamp((ROSTER_TEMPLATE[ps] + (ps === 'G' ? 2 : 3) - c[ps]) * 0.8, 0, 4);
-  return need;
-}
 function aiDraftPick(L) {
   const D = L.draft, pick = D.picks[D.cur], team = L.teams[pick.tid];
-  const need = teamNeedsSimple(L, team);
+  const dn = draftNeeds(L, team), need = {};
+  for (const ps of POSITIONS) need[ps] = clamp((dn[ps] - 5) * 0.8, -1.5, 4);
   let best = null, bv = -1e9;
   for (const pid of D.pool.slice(0, 60)) {
     const p = L.players[pid];
@@ -785,6 +782,8 @@ function finishDraft(L) {
   D.pool.forEach((pid, i) => { const p = L.players[pid]; if (i < 40) { p.tid = -1; p.sc = 3; L.fa.push(pid); } else delete L.players[pid]; });
   L.draft = null;
   for (const t of L.teams) { const f = farmRoster(L, t).sort((a, b) => playerValue(a) - playerValue(b)); while (f.length > FARM_LIMIT) releasePlayer(L, f.shift(), true); }
+  computeDraftGrades(L, D);
+  gradeSnapshot(L, 'fa');
   L.phase = 'resign';
   if (typeof startResign === 'function') startResign(L);
   news(L, `The ${D.year} Draft is complete. Draftees report to your farm team. Re-sign your expiring players before free agency opens.`, L.userTeam);
