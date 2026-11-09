@@ -665,7 +665,8 @@ function runOffseason(L) {
   }
   for (const t of L.teams) { t.rec = newRec(); t.ts = newTS(); }
   L.schedule = []; L.playoffs = null; L.day = 0;
-  // draft
+  // draft (auto scouting spends what's left first)
+  if (typeof autoScoutTick === 'function') autoScoutTick(L, 0);
   const pool = (L.prospects && L.prospects.length) ? L.prospects.slice() : generateDraftClass(L, 240);
   L.prospects = [];
   const picks = [];
@@ -746,7 +747,7 @@ function scoutPlayer(L, p) {
   L.scoutPts -= cost; p.sc = (p.sc || 0) + 1; updateScout(p); return null;
 }
 function sortBoard(L, ids) { return ids.sort((a, b) => { const A = L.players[a], B = L.players[b]; return (B.sPot * 0.6 + B.sOvr * 0.4) - (A.sPot * 0.6 + A.sOvr * 0.4); }); }
-function scoutDay(L) { if (L.phase === 'regular' && L.day % 14 === 0) L.scoutPts += 3; }
+function scoutDay(L) { if (L.phase === 'regular' && L.day % 14 === 0) { L.scoutPts += 3; if (typeof autoScoutTick === 'function') autoScoutTick(L, 10); } }
 function draftPlayer(L, pid) {
   const D = L.draft, pick = D.picks[D.cur], p = L.players[pid], team = L.teams[pick.tid];
   p.tid = team.id; p.farm = true; team.roster.push(p.id);
@@ -761,6 +762,7 @@ function draftPlayer(L, pid) {
 }
 function aiDraftPick(L) {
   const D = L.draft, pick = D.picks[D.cur], team = L.teams[pick.tid];
+  if (team.id === L.userTeam && typeof userAutoPick === 'function') { const up = userAutoPick(L); if (up) { draftPlayer(L, up.id); return; } }
   const dn = draftNeeds(L, team), need = {};
   for (const ps of POSITIONS) need[ps] = clamp((dn[ps] - 5) * 0.8, -1.5, 4);
   let best = null, bv = -1e9;
@@ -884,6 +886,7 @@ function loadLeague() {
     for (const id in L.players) { const p = L.players[id]; p.stats = Object.assign(emptyStats(), p.stats); p.pstats = Object.assign(emptyStats(), p.pstats); }
     if (typeof migrateOps === 'function') migrateOps(L);
     if (typeof migrateCoaches === 'function') migrateCoaches(L);
+    if (typeof autoGM === 'function') autoGM(L);
     return L;
   } catch (e) { console.error(e); return null; }
 }

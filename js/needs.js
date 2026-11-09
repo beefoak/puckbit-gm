@@ -180,13 +180,14 @@ function computeFAGrades(L) {
 
 // Spend scouting points on the best unscouted prospects at the positions the team needs most.
 function fitScore(p, need) { return p.sPot * 0.6 + p.sOvr * 0.4 + (need[p.pos] - 5) * 0.9; }
-function autoScoutNeeds(L) {
+function autoScoutNeeds(L, anyPos) {
   const need = draftNeeds(L, L.teams[L.userTeam]);
-  const pool = (L.draft ? L.draft.pool : L.prospects).slice(0, 90).map(id => L.players[id]).filter(Boolean);
+  const pool = (L.draft ? L.draft.pool : L.prospects || []).slice(0, 90).map(id => L.players[id]).filter(Boolean);
   let n = 0;
-  for (let guard = 0; guard < 40; guard++) {
-    const c = pool.filter(p => (p.sc || 0) < 3 && need[p.pos] >= 4.5 && [2, 3, 5][p.sc || 0] <= L.scoutPts)
-      .sort((a, b) => fitScore(b, need) - fitScore(a, need))[0];
+  for (let guard = 0; guard < 60; guard++) {
+    const ok = (p) => (p.sc || 0) < 3 && [2, 3, 5][p.sc || 0] <= L.scoutPts;
+    let c = pool.filter(p => ok(p) && need[p.pos] >= 4.5).sort((a, b) => fitScore(b, need) - fitScore(a, need))[0];
+    if (!c && anyPos) c = pool.slice(0, 40).filter(ok).sort((a, b) => fitScore(b, need) - fitScore(a, need))[0];
     if (!c || scoutPlayer(L, c)) break;
     n++;
   }

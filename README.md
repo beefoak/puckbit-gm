@@ -31,6 +31,7 @@ Then open http://localhost:8791.
 - **Advanced stats**: CF/CA (Corsi), ixG, GSAx, P/60, TOI, faceoffs, PP/PK, hits, blocks, takeaways and giveaways.
 - **Roster needs**: each position's depth chart is compared slot by slot with the league average and with the rest of your roster, giving a CRITICAL to STRONG need. Needs show up as fit tags on the big board and free agents, in the trade builder and on incoming offers (with before/after strength and rank), and steer AI drafting, free agency and trade offers. Auto-scout spends scouting points at your need positions.
 - **Offseason grades**: draft and free-agency grades are curved across the league from each team's change in strength (projected strength for the draft), its rank afterward, and, for the draft, value against slot and whether early picks filled needs.
+- **Auto GM**: picks you leave unmade at the draft go to the best fit on your scouted board (or press AUTO PICK). When free agency opens, expiring players you didn't re-sign or mark LET WALK are kept or let go by role, age, upside and the need their leaving would open. Each FA day it offers on the best affordable upgrades at your biggest needs, and auto scouting spends points at your need positions. Re-signing, FA and scouting each have an on/off toggle. Recap screens with the grades appear after the draft and after free agency.
 - **Front office**: salary cap with buyouts and dead money, re-signing, 5-day free agency, trades with picks and AI offers, a 7-round draft with lottery and scouting, and an AHL farm team.
 - **From the BitBall beta**:
   - coaching staffs (head coach, associate, assistant, goalie coach) with systems, quirks and a coaching carousel;
@@ -48,6 +49,7 @@ Then open http://localhost:8791.
 | `js/league.js` | Season, playoffs, awards, records, offseason, draft, save/load |
 | `js/biz.js` | Cap, contracts, free agency, trades |
 | `js/needs.js` | Positional needs, team strength, draft and free-agency grades |
+| `js/autogm.js` | Automatic draft picks, re-signing, free agency and scouting for your team |
 | `js/coaches.js`, `js/ops.js`, `js/morale.js`, `js/faces.js` | Beta systems adapted from BitBall |
 | `js/rink.js` | Live canvas rink viewer |
 | `js/ui*.js`, `js/main.js` | Interface and game flow |

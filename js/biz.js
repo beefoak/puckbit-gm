@@ -94,6 +94,8 @@ function offerResign(L, p, sal, yrs) {
 }
 // End of the re-sign phase: unsigned players become free agents.
 function startFreeAgency(L) {
+  const ar = autoGM(L).resign ? autoResignUser(L) : null;
+  L.autoResign = ar && { kept: ar.kept.map(p => p.ln), lost: ar.lost.length };
   for (const t of L.teams) for (const p of expiring(L, t)) { t.roster = t.roster.filter(id => id !== p.id); p.tid = -1; p.farm = false; p.ir = false; p.contract = null; L.fa.push(p.id); p.lastTeam = t.id; }
   L.phase = 'fa'; L.faDay = 1;
   L.fa.sort((a, b) => playerValue(L.players[b]) - playerValue(L.players[a]));
@@ -135,6 +137,7 @@ function aiFreeAgencyDay(L) {
   }
 }
 function advanceFADay(L) {
+  if (autoGM(L).fa) autoFAUser(L);
   aiFreeAgencyDay(L);
   L.faDay++;
   if (L.faDay > 5) endFreeAgency(L);

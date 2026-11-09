@@ -82,14 +82,19 @@ function onAct(act, el) {
     case 'hofPick': { UI.hofPick = UI.hofPick || []; const pid = +id; if (UI.hofPick.includes(pid)) UI.hofPick = UI.hofPick.filter(x => x !== pid); else if (UI.hofPick.length < 4) UI.hofPick.push(pid); else toast('Up to 4 inductees per year.'); hofBallotModal(); return; }
     case 'hofSubmit': { const picks = (UI.hofPick || []).map(pid => G.retired.find(r => r.pid === pid)).filter(Boolean); picks.forEach(r => { hofInduct(G, r, G.year + 1); news(G, `HALL OF FAME: ${r.name} (${r.pos}) is inducted into the Hall of Fame.`, -1); }); G.hofVoted = G.year; UI.hofPick = []; closeModal(); persist(); render(); toast(picks.length ? `${picks.length} new Hall of Famer${picks.length > 1 ? 's' : ''}!` : 'Nobody inducted this year.'); return; }
     case 'draftToMe': simDraftToUser(G); persist(); render(); if (draftDone(G)) toast('The draft is over.'); return;
-    case 'finishDraft': finishDraft(G); UI.tab = 'contracts'; persist(); render(); toast('Draft complete. Time to re-sign your players.'); return;
+    case 'finishDraft': finishDraft(G); UI.tab = 'contracts'; persist(); render(); recapModal('draft'); return;
+    case 'autoPick': { const p = userAutoPick(G); if (p) { draftPlayer(G, p.id); simDraftToUser(G); } persist(); render(); return; }
+    case 'autoGM': { const a = autoGM(G), k = el.dataset.k; a[k] = !a[k]; persist(); render(); toast(`Auto ${{ resign: 're-sign', fa: 'free agency', scout: 'scouting' }[k]} ${a[k] ? 'on' : 'off'}.`); return; }
+    case 'walk': { const p = G.players[+id]; p.walk = p.walk === G.year ? 0 : G.year; persist(); render(); return; }
+    case 'autoResignNow': { const r = autoResignUser(G); persist(); render(); toast(r.kept.length ? `Re-signed ${r.kept.map(p => p.ln).join(', ')}.${r.lost.length ? ` ${r.lost.length} turned you down or didn't fit under the cap.` : ''}` : 'Nobody else is worth re-signing at their price.'); return; }
+    case 'recap': recapModal(el.dataset.k, +el.dataset.y); return;
     case 'draftPick': draftPlayer(G, +id); simDraftToUser(G); persist(); render(); return;
     case 'dPos': UI.dPos = el.dataset.k; render(); return;
     case 'dSort': UI.dSort = el.dataset.k; render(); return;
     case 'autoScout': { const n = autoScoutNeeds(G); toast(n ? `Scouted ${n} prospect report${n > 1 ? 's' : ''} at your need positions. ${G.scoutPts} points left.` : G.scoutPts < 2 ? 'Not enough scouting points.' : 'No unscouted prospects at your need positions.'); persist(); render(); return; }
     case 'scout': { const err = scoutPlayer(G, G.players[+id]); if (err) toast(err); persist(); render(); return; }
-    case 'startFA': startFreeAgency(G); UI.tab = 'fa'; persist(); render(); return;
-    case 'faDay': advanceFADay(G); if (G.phase === 'preseason') { UI.tab = 'home'; toast('Free agency is over. Training camp opens.'); } persist(); render(); return;
+    case 'startFA': { startFreeAgency(G); UI.tab = 'fa'; persist(); render(); const r = G.autoResign; if (r && (r.kept.length || r.lost)) toast(`Auto re-sign: kept ${r.kept.length}${r.kept.length ? ' (' + r.kept.join(', ') + ')' : ''}${r.lost ? `, ${r.lost} turned you down or didn't fit under the cap` : ''}.`); return; }
+    case 'faDay': advanceFADay(G); if (G.phase === 'preseason') { UI.tab = 'home'; persist(); render(); recapModal('fa'); return; } persist(); render(); return;
     case 'autoCut': { const u = TM(G.userTeam); aiManageRoster(G, u, true); if (G.autoLines) u.lines = autoLines(G, u); persist(); render(); toast('Roster set: extras sent to the farm.'); return; }
     case 'startSeason': { const err = startSeason(G); if (err) { toast(err); return; } UI.tab = 'home'; UI.schedDay = null; persist(); render(); toast(`The ${seasonLabel(G.year)} season is underway!`); return; }
     case 'rSort': UI.rDir = UI.rSort === el.dataset.k ? -UI.rDir : -1; UI.rSort = el.dataset.k; render(); return;
