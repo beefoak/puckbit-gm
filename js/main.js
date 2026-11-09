@@ -192,4 +192,5 @@ document.addEventListener('change', (e) => {
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 $('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeModal(); });
 try { UI.watch = localStorage.getItem('phl_watch') !== '0'; } catch (e) { /* */ }
-render();
+SaveStore.onError = () => toast("Could not save - the browser refused storage for this site.");
+SaveStore.init().then(render, render);

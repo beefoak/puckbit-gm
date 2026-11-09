@@ -5,7 +5,7 @@ const UI = { tab: 'home', rPos: 'ALL', rSort: 'ovr', rDir: -1, stMode: 'sk', stS
 
 const $ = (s) => document.querySelector(s);
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 3200); }
-function persist() { if (!saveLeague(G)) toast('Could not save - browser storage is full or blocked.'); }
+function persist() { if (!saveLeague(G)) toast('Could not save this league - see the console for details.'); }
 const TM = (tid) => G.teams[tid];
 const panel = (title, body, cls) => `<section class="panel ${cls || ''}">${title ? `<h3 class="px">${title}</h3>` : ''}${body}</section>`;
 function ordinal(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }

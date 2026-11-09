@@ -810,6 +810,60 @@ function startSeason(L) {
 function nextPhaseFromPost(L) { runOffseason(L); }
 
 // ---------- Save / Load ----------
+// Saves live in IndexedDB. localStorage is only a fallback: every GitHub Pages site on the same
+// account shares one origin and one ~5 MB localStorage quota, so other games' saves can fill it.
+// The save string is cached in memory so the save API stays synchronous for callers.
+const SaveStore = (() => {
+  const DB = 'phl_gm', OS = 'saves';
+  let db = null, cache = null, writing = false, pending = null;
+  const S = { onError: null };
+  function openDB() {
+    return new Promise((res) => {
+      try {
+        if (typeof indexedDB === 'undefined') return res(null);
+        const rq = indexedDB.open(DB, 1);
+        rq.onupgradeneeded = () => rq.result.createObjectStore(OS);
+        rq.onsuccess = () => res(rq.result);
+        rq.onerror = () => res(null);
+        rq.onblocked = () => res(null);
+      } catch (e) { res(null); }
+    });
+  }
+  function req(mode, fn) {
+    return new Promise((res, rej) => {
+      const tx = db.transaction(OS, mode), r = fn(tx.objectStore(OS));
+      tx.oncomplete = () => res(r.result); tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error);
+    });
+  }
+  function lsGet() { try { return localStorage.getItem(SAVE_KEY); } catch (e) { return null; } }
+  function lsSet(v) { try { localStorage.setItem(SAVE_KEY, v); return true; } catch (e) { return false; } }
+  function lsDel() { try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* */ } }
+  S.init = async function () {
+    db = await openDB();
+    if (db) {
+      try { cache = (await req('readonly', s => s.get(SAVE_KEY))) || null; } catch (e) { cache = null; }
+      const old = lsGet();
+      if (!cache && old) { // migrate an old localStorage save, then free the shared quota
+        try { await req('readwrite', s => s.put(old, SAVE_KEY)); cache = old; lsDel(); } catch (e) { cache = old; }
+      } else if (cache && old) lsDel();
+    } else cache = lsGet();
+  };
+  async function flush() {
+    if (writing) return; writing = true;
+    while (pending !== null) {
+      const v = pending; pending = null;
+      let ok = false;
+      if (db) { try { await req('readwrite', s => v === '' ? s.delete(SAVE_KEY) : s.put(v, SAVE_KEY)); ok = true; } catch (e) { console.error('IndexedDB save failed', e); } }
+      if (!ok && v !== '') ok = lsSet(v);
+      if (!ok && v !== '' && S.onError) S.onError();
+    }
+    writing = false;
+  }
+  S.get = () => cache;
+  S.set = (v) => { cache = v; pending = v; flush(); return true; };
+  S.del = () => { cache = null; pending = ''; lsDel(); flush(); };
+  return S;
+})();
 function serializeLeague(L) {
   return JSON.stringify(L, function (k, v) {
     if ((k === 'stats' || k === 'pstats') && v && typeof v === 'object' && 'ixg' in v) return compactStats(v);
@@ -820,12 +874,12 @@ function saveLeague(L) {
   try {
     const raw = serializeLeague(L);
     const data = typeof LZString !== 'undefined' ? 'LZ1:' + LZString.compressToUTF16(raw) : raw;
-    localStorage.setItem(SAVE_KEY, data); return true;
+    return SaveStore.set(data);
   } catch (e) { console.error('save failed', e); return false; }
 }
 function loadLeague() {
   try {
-    let s = localStorage.getItem(SAVE_KEY); if (!s) return null;
+    let s = SaveStore.get(); if (!s) return null;
     if (s.startsWith('LZ1:')) s = LZString.decompressFromUTF16(s.slice(4));
     const L = JSON.parse(s); if (!L || L.version !== 1) return null;
     for (const id in L.players) { const p = L.players[id]; p.stats = Object.assign(emptyStats(), p.stats); p.pstats = Object.assign(emptyStats(), p.pstats); }
@@ -834,6 +888,6 @@ function loadLeague() {
     return L;
   } catch (e) { console.error(e); return null; }
 }
-function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
-function deleteSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ } }
-function saveSize() { try { return (localStorage.getItem(SAVE_KEY) || '').length; } catch (e) { return 0; } }
+function hasSave() { return !!SaveStore.get(); }
+function deleteSave() { SaveStore.del(); }
+function saveSize() { return (SaveStore.get() || '').length; }
