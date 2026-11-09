@@ -107,7 +107,7 @@ function vTrade() {
     h += panel(`TRADE OFFERS · ${G.offers.length}`, G.offers.map(o => { const desc = (arr) => arr.map(a => a.type === 'pick' ? `${a.year} R${a.rd} pick (${TM(a.orig).abbr})` : G.players[a.pid] ? `${G.players[a.pid].pos} ${pLink(G.players[a.pid])} (${G.players[a.pid].ovr})` : '?').join(', ');
       const ids = (arr) => arr.filter(a => a.type === 'player' && G.players[a.pid]).map(a => a.pid);
       const imp = tradeImpact(G, G.userTeam, ids(o.want), ids(o.give));
-      return `<div class="offer-card"><div class="offer-head">${crest(o.partner, 24)} <b>${esc(TM(o.partner).city)} ${esc(TM(o.partner).name)}</b> <span class="small dim">their needs:</span> ${needRow(teamNeeds(G, TM(o.partner)))}</div><p>They want: ${desc(o.want)}</p><p>They offer: ${desc(o.give)}</p>${impactHtml(imp, 'YOU:')}<p class="small">${impactVerdict(imp)}</p><button class="btn tiny" data-act="acceptOffer" data-id="${o.id}">ACCEPT</button><button class="btn tiny alt" data-act="declineOffer" data-id="${o.id}">DECLINE</button></div>`; }).join(''), 'recpanel');
+      return `<div class="offer-card"><div class="offer-head">${crest(o.partner, 24)} <b>${esc(TM(o.partner).city)} ${esc(TM(o.partner).name)}</b> <span class="small dim">their needs:</span> ${needRow(teamNeeds(G, TM(o.partner)))} <span class="small dim">your needs:</span> ${needRow(teamNeeds(G, TM(G.userTeam)))}</div><p>They want: ${desc(o.want)}</p><p>They offer: ${desc(o.give)}</p>${impactHtml(imp, 'YOU:')}<p class="small">${impactVerdict(imp)}</p><button class="btn tiny" data-act="acceptOffer" data-id="${o.id}">ACCEPT</button><button class="btn tiny alt" data-act="declineOffer" data-id="${o.id}">DECLINE</button></div>`; }).join(''), 'recpanel');
   }
   if (G.phase === 'playoffs') return h + panel('TRADE', '<p class="dim">No trades during the playoffs.</p>');
   const partner = T.partner === null ? null : +T.partner;
@@ -153,22 +153,23 @@ function vDraft() {
   let ids = pool.map((id, i) => ({ id, i, p: G.players[id] })).filter(x => x.p && (dPos === 'ALL' || (dPos === 'F' ? FWD.includes(x.p.pos) : x.p.pos === dPos)));
   if (fitSort) ids.sort((a, b) => fitScore(b.p, need) - fitScore(a.p, need));
   ids = ids.slice(0, 160);
-  const rows = ids.map(({ i, p }) => { return `<tr><td class="dim">${i + 1}</td><td>${p.pos}</td><td>${needChip(p.pos, need[p.pos], true)}</td><td>${pLink(p)}</td><td>${p.age}</td><td class="small">${esc(p.nat)} · ${esc(p.college || '')}</td><td>${ovrB(p.sOvr)}</td><td>${potB(p.sPot)}</td><td><span class="pips">${[0, 1, 2].map(k => `<i class="${(p.sc || 0) > k ? 'on' : ''}"></i>`).join('')}</span></td><td>${(p.sc || 0) < 3 ? `<button class="btn tiny alt" data-act="scout" data-id="${p.id}">SCOUT (${[2, 3, 5][p.sc || 0]})</button>` : ''}${D && !draftDone(G) && D.picks[D.cur].tid === G.userTeam ? `<button class="btn tiny" data-act="draftPick" data-id="${p.id}">DRAFT</button>` : ''}</td></tr>`; }).join('');
-  h += `<div class="grid-draft">`;
+  const rows = ids.map(({ i, p }) => { return `<tr><td class="dim">${i + 1}</td><td>${p.pos}</td><td>${needChip(p.pos, need[p.pos], true)}</td><td>${pLink(p)}</td><td>${p.age}</td><td class="small">${esc(p.nat)} · ${esc(p.college || '')}</td><td>${ovrB(p.sOvr)}</td><td>${potB(p.sPot)}</td><td><span class="pips">${[0, 1, 2].map(k => `<i class="${(p.sc || 0) > k ? 'on' : ''}"></i>`).join('')}</span></td><td class="acts">${D && !draftDone(G) && D.picks[D.cur].tid === G.userTeam ? `<button class="btn tiny" data-act="draftPick" data-id="${p.id}">DRAFT</button>` : ''}${(p.sc || 0) < 3 ? `<button class="btn tiny alt" data-act="scout" data-id="${p.id}">SCOUT (${[2, 3, 5][p.sc || 0]})</button>` : ''}</td></tr>`; }).join('');
+  h += `<div class="grid-draft ${D && !draftDone(G) ? 'drafting' : ''}">`;
   const filt = autoToggles(['scout']) + `<div class="filters">${['ALL', 'F', 'C', 'LW', 'RW', 'D', 'G'].map(k => `<button class="chip ${dPos === k ? 'on' : ''}" data-act="dPos" data-k="${k}">${k}</button>`).join('')} <button class="chip ${fitSort ? '' : 'on'}" data-act="dSort" data-k="board">BOARD ORDER</button><button class="chip ${fitSort ? 'on' : ''}" data-act="dSort" data-k="fit" title="Board value plus a bonus at positions you need">BEST FIT</button> <button class="btn tiny alt" data-act="autoScout" title="Spend scouting points on top prospects at your need positions">AUTO-SCOUT NEEDS</button></div>`;
   h += panel(`BIG BOARD${D ? ` · SCOUTING POINTS ${G.scoutPts}` : ''}`, `${filt}<div class="scroll tall bigboard"><table class="tbl small"><tr><th>#</th><th>POS</th><th>FIT</th><th>NAME</th><th>AGE</th><th>FROM</th><th>OVR*</th><th>POT*</th><th>SCOUTED</th><th></th></tr>${rows}</table></div><p class="dim small">* scouting estimates.</p>`);
   let side = '';
   if (D) {
     const made = D.picks.filter(p => p.pid).slice(-40).reverse();
-    side += `<h4 class="px">YOUR PICKS</h4><table class="tbl small">${D.picks.filter(p => p.tid === G.userTeam).map(p => `<tr><td>R${p.rd} #${p.ovr}</td><td>${p.pid ? pidLink(p.pid, p.name) + ` <span class="dim">${p.pos}</span>` : '<span class="dim">-</span>'}</td></tr>`).join('')}</table>
-      <h4 class="px">RECENT PICKS</h4><table class="tbl small">${made.map(p => `<tr><td class="dim">#${p.ovr}</td><td>${crest(p.tid, 14)} ${esc(TM(p.tid).abbr)}</td><td>${pidLink(p.pid, p.name)} <span class="dim">${p.pos}</span></td></tr>`).join('')}</table>`;
+    side += `<div><h4 class="px">YOUR PICKS</h4><table class="tbl small">${D.picks.filter(p => p.tid === G.userTeam).map(p => `<tr><td>R${p.rd} #${p.ovr}</td><td>${p.pid ? pidLink(p.pid, p.name) + ` <span class="dim">${p.pos}</span>` : '<span class="dim">-</span>'}</td></tr>`).join('')}</table>
+</div>
+      <div><h4 class="px">RECENT PICKS</h4><table class="tbl small">${made.map(p => `<tr><td class="dim">#${p.ovr}</td><td>${crest(p.tid, 14)} ${esc(TM(p.tid).abbr)}</td><td>${pidLink(p.pid, p.name)} <span class="dim">${p.pos}</span></td></tr>`).join('')}</table></div>`;
   } else {
     const yrs = Object.keys(G.draftHistory).map(Number).sort((a, b) => b - a);
     if (yrs.length) { const y = yrs[0]; side += `<h4 class="px">${y} DRAFT · FIRST ROUND</h4><table class="tbl small">${G.draftHistory[y].filter(p => p.rd === 1).map(p => `<tr class="${p.tid === G.userTeam ? 'me-row' : ''}"><td class="dim">#${p.ovr}</td><td>${crest(p.tid, 14)} ${esc(TM(p.tid).abbr)}</td><td>${pidLink(p.pid, p.name)} <span class="dim">${p.pos}</span></td></tr>`).join('')}</table>`; }
     else side += '<p class="dim">Draft history appears after your first draft.</p>';
   }
-  side = `<h4 class="px">YOUR NEEDS</h4>${needBars(need)}<p class="dim small">Draft needs blend today's depth chart with how it looks in two seasons, when today's prospects are ready.</p>` + side;
-  h += panel('DRAFT ROOM', side) + `</div>`;
+  side = `<div><h4 class="px">YOUR NEEDS</h4>${needBars(need)}<p class="dim small">Draft needs blend today's depth chart with how it looks in two seasons, when today's prospects are ready.</p></div>` + side;
+  h += panel('DRAFT ROOM', `<div class="droom">${side}</div>`) + `</div>`;
   if (!D) { const ys = Object.keys(G.grades || {}).map(Number).filter(y => G.grades[y].draft).sort((a, b) => b - a); if (ys.length) h += gradesPanel('draft', ys[0]); }
   return h;
 }

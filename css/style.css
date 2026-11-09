@@ -274,3 +274,12 @@ ul.pbp li{padding:2px 0;border-bottom:1px dashed #263060}ul.pbp li.goal{color:va
 .report .grade{font-size:22px;padding:10px 8px;min-width:64px}
 .gA{background:#3fdc6c}.gB{background:#7fd1ff}.gC{background:#c9cfe8}.gD{background:#ff9f1c}.gF{background:#ff4d5e}
 .report{display:flex;gap:14px;align-items:flex-start;margin-bottom:10px}.report p{margin:2px 0 6px}
+
+/* draft in progress: board takes the full width and most of the window, draft room sits underneath */
+.grid-draft.drafting{grid-template-columns:minmax(0,1fr)}
+.grid-draft.drafting .bigboard{max-height:max(360px,calc(100vh - 200px))}
+.bigboard th{position:sticky;top:0;background:var(--panel);z-index:1}
+.bigboard td.acts{white-space:nowrap}
+.grid-draft.drafting .droom{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:900px){.grid-draft.drafting .droom{grid-template-columns:minmax(0,1fr)}}
+.offer-head{flex-wrap:wrap}
